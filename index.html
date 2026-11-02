@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Route Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column; the form, then the legs to tap, then the stop order */
+:root {
+  --bg: #eef1ef; --surface: #ffffff; --fg: #17201b; --muted: #58655d; --line: #d3dbd6;
+  --accent: #1b6b45; --on-accent: #ffffff; --bad: #b3261e; --warn-bg: #fdf0c4; --warn-fg: #5c4500;
+  --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #111613; --surface: #1a211d; --fg: #e5ebe7; --muted: #95a39b; --line: #2b3530;
+  --accent: #5cc48f; --on-accent: #0b1a12; --bad: #f2867d; --warn-bg: #3d3210; --warn-fg: #f4d77a; color-scheme: dark } }
+
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--body); }
+.wrap { max-width: 640px; margin: 0 auto; display: grid; gap: 16px;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left)); }
+h1 { font-size: 1.75rem; line-height: 1.1; margin: 0; }
+h2 { font-size: 1rem; margin: 0; }
+p { margin: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+label { display: grid; gap: 4px; font-weight: 700; }
+label small { font-weight: 400; color: var(--muted); }
+input:not([type=checkbox]), textarea { font: 1rem var(--body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; width: 100%; box-sizing: border-box; }
+textarea { font: .85rem/1.5 var(--mono); resize: vertical; }
+.btn { display: block; text-align: center; text-decoration: none; font: 700 1rem var(--body); padding: 14px 18px; border-radius: 8px; border: 2px solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.ghost { background: transparent; color: var(--accent); font-weight: 700; }
+.field { display: grid; gap: 8px; }
+/* The real input stays in the page: some Android browsers ignore taps on a display:none input */
+#shots { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.status { font-size: .9rem; color: var(--muted); }
+.status.bad { color: var(--bad); }
+#legs { display: grid; gap: 8px; }
+#legs small { display: block; font-weight: 400; font-size: .8rem; overflow-wrap: anywhere; }
+ol { margin: 0; padding-left: 2em; display: grid; gap: 6px; font-variant-numeric: tabular-nums; }
+li { overflow-wrap: anywhere; }
+#order label { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; cursor: pointer; }
+#order input { flex: none; width: 1.4em; height: 1.4em; margin: 0; accent-color: var(--accent); }
+li.done { color: var(--muted); }
+li.done label { text-decoration: line-through; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pair .btn { padding-inline: 8px; }
+.chip { display: inline-block; font-size: .75rem; padding: 0 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn-fg); white-space: nowrap; }
+.missing { color: var(--bad); font-size: .9rem; display: grid; gap: 6px; }
+.missing[hidden] { display: none; }
+.fix { font: .9rem var(--mono); text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--bad); background: transparent; color: var(--bad); cursor: pointer; overflow-wrap: anywhere; }
+.fix:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Route Planner</h1>
+
+  <form id="plan" class="card">
+    <label for="start">Start <small>Leave blank to start from where you are</small>
+      <input id="start" autocomplete="off" placeholder="e.g. 400 DEMO ST, MADISON, WI"></label>
+    <label for="end">End
+      <input id="end" autocomplete="off" required placeholder="Where the day finishes"></label>
+    <div class="field">
+      <label for="stops">Stops <small>One address per line. Import your Flex itinerary screenshots, or type them.</small></label>
+      <div class="pair">
+        <label class="btn ghost" for="shots">Import screenshots</label>
+        <button type="button" class="btn ghost" id="newday">Start a new day</button>
+      </div>
+      <input type="file" id="shots" accept="image/*" multiple>
+      <textarea id="stops" rows="10" wrap="off" placeholder="100 SAMPLE CT, SUN PRAIRIE, WI&#10;200 EXAMPLE TER UNIT 3, MADISON, WI"></textarea>
+    </div>
+    <button class="btn" id="go">Plan route</button>
+    <p class="status" id="status" role="status">Finding addresses takes about a second per stop.</p>
+  </form>
+
+  <section id="result" class="card" hidden aria-labelledby="rh">
+    <h2 id="rh">Your route</h2>
+    <p id="summary"></p>
+    <div id="missing" class="missing" hidden></div>
+    <div id="legs"></div>
+    <ol id="order"></ol>
+  </section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
