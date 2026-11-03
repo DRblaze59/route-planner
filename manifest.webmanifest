@@ -1,0 +1,15 @@
+{
+  "name": "Route Planner",
+  "short_name": "Routes",
+  "description": "Plan a driving day from Amazon Flex screenshots.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef1ef",
+  "theme_color": "#1b6b45",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
