@@ -40,7 +40,8 @@ async function googleFind(addr, key) {
     bounds: { south: 42.5, west: -90.3, north: 43.7, east: -87.7 },
   }).catch(e => {
     if (e.code === 'ZERO_RESULTS') return { results: [] };
-    throw new Error(`Google's address lookup answered ${e.code ?? e.message}. Check the key under Google address lookup.`);
+    // Google's message names the cause (API not enabled, billing off, key restricted), so show all of it.
+    throw new Error(`Google's address lookup answered: ${e.message ?? e.code}`);
   })]);
   const [hit] = results;
   if (!hit) return null;
