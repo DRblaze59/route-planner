@@ -66,9 +66,9 @@ No build step. Files sit at the repo root and are served by GitHub Pages.
 **Description:** Add a manifest, an icon and a service worker that caches the app's own files. Brave → "Install app" then gives a full-screen app with its own icon.
 **Acceptance criteria:**
 - [x] Brave offers "Install app", and the installed app opens without the browser bar
-- [ ] The app's screen loads with no signal (planning still needs signal, and it says so)
+- [x] The app's screen loads with no signal (planning still needs signal, and it says so)
 **Verification:**
-- [ ] Manual check on the S26: install it, turn on airplane mode, open it, and the screen loads
+- [x] Manual check on the S26: install it, turn on airplane mode, open it, and the screen loads
 **Dependencies:** Task 4
 **Files:** `manifest.webmanifest`, `sw.js`, `icon.svg`, `index.html`
 **Scope:** S
