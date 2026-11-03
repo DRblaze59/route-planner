@@ -65,7 +65,7 @@ No build step. Files sit at the repo root and are served by GitHub Pages.
 ## Task 5: Install as an app
 **Description:** Add a manifest, an icon and a service worker that caches the app's own files. Brave → "Install app" then gives a full-screen app with its own icon.
 **Acceptance criteria:**
-- [ ] Brave offers "Install app", and the installed app opens without the browser bar
+- [x] Brave offers "Install app", and the installed app opens without the browser bar
 - [ ] The app's screen loads with no signal (planning still needs signal, and it says so)
 **Verification:**
 - [ ] Manual check on the S26: install it, turn on airplane mode, open it, and the screen loads
