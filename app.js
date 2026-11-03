@@ -45,15 +45,18 @@ async function googleFind(addr, key) {
   })]);
   const [hit] = results;
   if (!hit) return null;
-  const exact = hit.types.some(t => ['street_address', 'premise', 'subpremise'].includes(t));
+  // A partial match is Google's guess at a misread address, so it gets the "check" chip.
+  const exact = !hit.partial_match && hit.types.some(t => ['street_address', 'premise', 'subpremise'].includes(t));
   return { lat: hit.geometry.location.lat(), lng: hit.geometry.location.lng(), exact, t: Date.now() };
 }
 
 let googleOff = null; // why Google was skipped in this plan, if it was
 
 async function geocode(addr) {
-  if (fresh(found[addr])) return found[addr];
-  const key = $('gkey').value.trim();
+  const key = $('gkey').value.trim(), had = found[addr];
+  // Street-only guesses saved by the free lookup get another try with Google; if Google misses, the guess stays.
+  const retry = key && !googleOff && had && !had.t && !had.exact;
+  if (fresh(had) && !retry) return had;
   // A refused or over-limit key shouldn't stop the day: the rest of this plan uses the free lookup.
   const g = key && !googleOff ? await googleFind(addr, key).catch(e => { googleOff = e.message; return nominatim(addr); })
     : await nominatim(addr);
@@ -64,7 +67,7 @@ async function geocode(addr) {
     if (keys.length > 3000) keys.slice(0, 1000).forEach(k => delete found[k]);
     store('rp.geo', found);
   }
-  return g;
+  return g ?? (retry ? had : null);
 }
 
 async function nominatim(addr) {

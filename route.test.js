@@ -101,3 +101,9 @@ test('straight-line fallback orders stops along a road and keeps the end last', 
   assert.deepEqual(seq, [0, 2, 4, 1, 3]);
   assert.ok(!seq.includes(lngs.length - 1));
 });
+
+test('straight-line fallback counts north-south distance too', () => {
+  // 0.2° of latitude is about 22 km, so roughly 39 min at the assumed road speed.
+  const [[, t]] = straightTimes([{ lat: 43.0, lng: -89.4 }, { lat: 43.2, lng: -89.4 }]);
+  assert.ok(t > 2100 && t < 2500, `got ${t}`);
+});
