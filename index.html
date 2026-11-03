@@ -40,6 +40,7 @@ textarea { font: .85rem/1.5 var(--mono); resize: vertical; }
 /* The real input stays in the page: some Android browsers ignore taps on a display:none input */
 #shots { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+summary { font-weight: 700; cursor: pointer; }
 .status { font-size: .9rem; color: var(--muted); }
 .status.bad { color: var(--bad); }
 #legs { display: grid; gap: 8px; }
@@ -88,6 +89,12 @@ li.done label { text-decoration: line-through; }
     <div id="legs"></div>
     <ol id="order"></ol>
   </section>
+
+  <details class="card">
+    <summary>Google address lookup</summary>
+    <label for="gkey">Google Maps key <small>Optional. With a key, addresses are found by Google, which copes better with misspellings and rural roads. Saved only on this phone.</small>
+      <input id="gkey" autocomplete="off" spellcheck="false" placeholder="Paste your key"></label>
+  </details>
 </main>
 <script type="module" src="app.js"></script>
 </body>

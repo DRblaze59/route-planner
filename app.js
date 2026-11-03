@@ -15,8 +15,54 @@ let state = load('rp.state', { start: '', end: '', stops: '', route: null, total
 const save = () => store('rp.state', state);
 const found = load('rp.geo', {}); // address -> {lat, lng, exact} or null
 
+// Google's terms allow keeping its coordinates for 30 days, so its answers carry a timestamp.
+const fresh = g => g && (!g.t || Date.now() - g.t < 30 * 864e5);
+
+let geocoder, refused;
+// A refused key makes Google stop answering rather than fail, so this rejects any lookup still waiting.
+const keyRefused = new Promise((_, no) => { refused = no; });
+keyRefused.catch(() => {});
+function googleGeocoder(key) {
+  return geocoder ??= new Promise((ok, fail) => {
+    window.gm_authFailure = () => refused(new Error("Google didn't accept the key. Check it under Google address lookup."));
+    window.gmReady = () => google.maps.importLibrary('geocoding').then(l => ok(new l.Geocoder()), fail);
+    const s = document.createElement('script');
+    s.src = 'https://maps.googleapis.com/maps/api/js?' + new URLSearchParams({ key, v: 'weekly', loading: 'async', callback: 'gmReady' });
+    s.onerror = () => { geocoder = null; fail(new TypeError('load failed')); };
+    document.head.append(s);
+  });
+}
+
+async function googleFind(addr, key) {
+  const g = await googleGeocoder(key);
+  const { results } = await Promise.race([keyRefused, g.geocode({
+    address: addr, componentRestrictions: { country: 'US', administrativeArea: 'WI' },
+    bounds: { south: 42.5, west: -90.3, north: 43.7, east: -87.7 },
+  }).catch(e => {
+    if (e.code === 'ZERO_RESULTS') return { results: [] };
+    throw new Error(`Google's address lookup answered ${e.code ?? e.message}. Check the key under Google address lookup.`);
+  })]);
+  const [hit] = results;
+  if (!hit) return null;
+  const exact = hit.types.some(t => ['street_address', 'premise', 'subpremise'].includes(t));
+  return { lat: hit.geometry.location.lat(), lng: hit.geometry.location.lng(), exact, t: Date.now() };
+}
+
 async function geocode(addr) {
-  if (found[addr]) return found[addr];
+  if (fresh(found[addr])) return found[addr];
+  const key = $('gkey').value.trim();
+  const g = key ? await googleFind(addr, key) : await nominatim(addr);
+  if (g) { // misses aren't cached, so a retry asks again
+    found[addr] = g;
+    // shortcut: drops the oldest third once 3000 addresses are cached; plenty for one driver
+    const keys = Object.keys(found);
+    if (keys.length > 3000) keys.slice(0, 1000).forEach(k => delete found[k]);
+    store('rp.geo', found);
+  }
+  return g;
+}
+
+async function nominatim(addr) {
   let g = null;
   for (const [k, text] of geoQueries(addr).entries()) {
     const q = new URLSearchParams({ format: 'jsonv2', limit: '1', countrycodes: 'us', addressdetails: '1', viewbox: VIEWBOX, q: text });
@@ -28,13 +74,6 @@ async function geocode(addr) {
     // Without the city only an exact house match counts: many towns share a street name.
     if (hit && (k === 0 || exact)) g = { lat: +hit.lat, lng: +hit.lon, exact };
     if (g?.exact) break;
-  }
-  if (g) { // misses aren't cached, so a retry asks again
-    found[addr] = g;
-    // shortcut: drops the oldest third once 3000 addresses are cached; plenty for one driver
-    const keys = Object.keys(found);
-    if (keys.length > 3000) keys.slice(0, 1000).forEach(k => delete found[k]);
-    store('rp.geo', found);
   }
   return g;
 }
@@ -113,6 +152,13 @@ for (const id of ['start', 'end', 'stops']) {
   $(id).addEventListener('input', () => { state[id] = $(id).value; save(); });
 }
 render();
+
+// Kept apart from the day's state, so "Start a new day" leaves it alone.
+$('gkey').value = load('rp.gkey', '');
+$('gkey').addEventListener('change', () => {
+  store('rp.gkey', $('gkey').value.trim());
+  if (geocoder) location.reload(); // Google's script can only be loaded once per page, with one key
+});
 
 // The text reader is about 15 MB, so it loads on the first import only.
 let worker, onProgress = () => {};
