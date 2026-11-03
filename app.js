@@ -49,10 +49,14 @@ async function googleFind(addr, key) {
   return { lat: hit.geometry.location.lat(), lng: hit.geometry.location.lng(), exact, t: Date.now() };
 }
 
+let googleOff = null; // why Google was skipped in this plan, if it was
+
 async function geocode(addr) {
   if (fresh(found[addr])) return found[addr];
   const key = $('gkey').value.trim();
-  const g = key ? await googleFind(addr, key) : await nominatim(addr);
+  // A refused or over-limit key shouldn't stop the day: the rest of this plan uses the free lookup.
+  const g = key && !googleOff ? await googleFind(addr, key).catch(e => { googleOff = e.message; return nominatim(addr); })
+    : await nominatim(addr);
   if (g) { // misses aren't cached, so a retry asks again
     found[addr] = g;
     // shortcut: drops the oldest third once 3000 addresses are cached; plenty for one driver
@@ -215,6 +219,7 @@ $('plan').addEventListener('submit', async e => {
   if (!end) return say('Add where the route should end.', true);
   if (!stops.length) return say(listed.length ? 'Every stop is ticked off. Start a new day to plan again.' : 'Add at least one stop.', true);
   $('go').disabled = true;
+  googleOff = null;
   try {
     const all = [...(start ? [start] : []), ...stops, end];
     const pts = [];
@@ -241,8 +246,11 @@ $('plan').addEventListener('submit', async e => {
       rough,
     });
     save(); render();
-    say(rough ? "The drive-time service didn't answer, so stops are ordered by straight-line distance. Plan again later for a better order."
-      : 'Planned. Open the legs in order, and tick stops off as you go.', rough);
+    const notes = [
+      googleOff && `Google's address lookup didn't work, so the free lookup was used instead. ${googleOff}`,
+      rough && "The drive-time service didn't answer, so stops are ordered by straight-line distance. Plan again later for a better order.",
+    ].filter(Boolean);
+    say(notes.length ? notes.join(' ') : 'Planned. Open the legs in order, and tick stops off as you go.', notes.length > 0);
   } catch (err) {
     say(err instanceof TypeError && /fetch|network|load/i.test(err.message) ? 'No connection to the map services. Check your signal and try again.' : err.message, true);
   }
