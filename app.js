@@ -1,4 +1,4 @@
-import { parseStops, geoQueries, findAddresses, straightTimes, order, pathCost, legs, mapsUrl } from './route.js';
+import { parseStops, geoQueries, findAddresses, straightTimes, needsLookup, googleExact, order, pathCost, legs, mapsUrl } from './route.js';
 
 const $ = id => document.getElementById(id);
 const say = (t, bad) => { $('status').textContent = t; $('status').classList.toggle('bad', !!bad); };
@@ -14,9 +14,6 @@ const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } ca
 let state = load('rp.state', { start: '', end: '', stops: '', route: null, total: 0, missing: [], done: [] });
 const save = () => store('rp.state', state);
 const found = load('rp.geo', {}); // address -> {lat, lng, exact} or null
-
-// Google's terms allow keeping its coordinates for 30 days, so its answers carry a timestamp.
-const fresh = g => g && (!g.t || Date.now() - g.t < 30 * 864e5);
 
 let geocoder, refused;
 // A refused key makes Google stop answering rather than fail, so this rejects any lookup still waiting.
@@ -45,18 +42,15 @@ async function googleFind(addr, key) {
   })]);
   const [hit] = results;
   if (!hit) return null;
-  // A partial match is Google's guess at a misread address, so it gets the "check" chip.
-  const exact = !hit.partial_match && hit.types.some(t => ['street_address', 'premise', 'subpremise'].includes(t));
-  return { lat: hit.geometry.location.lat(), lng: hit.geometry.location.lng(), exact, t: Date.now() };
+  return { lat: hit.geometry.location.lat(), lng: hit.geometry.location.lng(), exact: googleExact(hit), t: Date.now() };
 }
 
 let googleOff = null; // why Google was skipped in this plan, if it was
 
 async function geocode(addr) {
   const key = $('gkey').value.trim(), had = found[addr];
-  // Street-only guesses saved by the free lookup get another try with Google; if Google misses, the guess stays.
-  const retry = key && !googleOff && had && !had.t && !had.exact;
-  if (fresh(had) && !retry) return had;
+  if (!needsLookup(had, { key, googleOff })) return had;
+  const keep = !needsLookup(had); // a still-valid guess being retried with Google stays if Google misses
   // A refused or over-limit key shouldn't stop the day: the rest of this plan uses the free lookup.
   const g = key && !googleOff ? await googleFind(addr, key).catch(e => { googleOff = e.message; return nominatim(addr); })
     : await nominatim(addr);
@@ -67,7 +61,7 @@ async function geocode(addr) {
     if (keys.length > 3000) keys.slice(0, 1000).forEach(k => delete found[k]);
     store('rp.geo', found);
   }
-  return g ?? (retry ? had : null);
+  return g ?? (keep ? had : null);
 }
 
 async function nominatim(addr) {

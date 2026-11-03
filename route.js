@@ -53,7 +53,21 @@ export function straightTimes(pts) {
   return pts.map(a => pts.map(b => (km(a, b) * 1.3 / 45) * 3600));
 }
 
-export const pathCost =(d, p) => p.reduce((s, v, i) => (i ? s + d[p[i - 1]][v] : 0), 0);
+// Google's terms allow keeping its coordinates for 30 days, so its answers carry a timestamp `t`.
+const KEEP_MS = 30 * 864e5;
+
+// Whether a saved lookup has to be asked again. With a key, street-only guesses from the
+// free lookup get a try with Google, unless Google has already failed in this plan.
+export function needsLookup(had, { key = '', googleOff = null, now = Date.now() } = {}) {
+  if (!had || (had.t && now - had.t >= KEEP_MS)) return true;
+  return !!(key && !googleOff && !had.t && !had.exact);
+}
+
+// A partial match is Google's guess at a misread address, so it isn't exact.
+export const googleExact = hit =>
+  !hit.partial_match && hit.types.some(t => ['street_address', 'premise', 'subpremise'].includes(t));
+
+export const pathCost = (d, p) => p.reduce((s, v, i) => (i ? s + d[p[i - 1]][v] : 0), 0);
 
 // d: matrix of drive times. The last index is the end. `start` is the index of a fixed
 // start, or null to let the route begin at whichever stop is best.

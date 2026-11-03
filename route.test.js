@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseStops, geoQuery, geoQueries, findAddresses, straightTimes, order, pathCost, legs, mapsUrl } from './route.js';
+import { parseStops, geoQuery, geoQueries, findAddresses, straightTimes, needsLookup, googleExact, order, pathCost, legs, mapsUrl } from './route.js';
 
 const line = xs => xs.map(a => xs.map(b => Math.abs(a - b)));
 
@@ -106,4 +106,23 @@ test('straight-line fallback counts north-south distance too', () => {
   // 0.2° of latitude is about 22 km, so roughly 39 min at the assumed road speed.
   const [[, t]] = straightTimes([{ lat: 43.0, lng: -89.4 }, { lat: 43.2, lng: -89.4 }]);
   assert.ok(t > 2100 && t < 2500, `got ${t}`);
+});
+
+test('needsLookup reuses saved stops, retries street-only ones with Google, and expires Google after 30 days', () => {
+  const day = 864e5, now = 100 * day;
+  const exact = { lat: 1, lng: 1, exact: true }, street = { lat: 1, lng: 1, exact: false };
+  assert.equal(needsLookup(undefined, { now }), true);
+  assert.equal(needsLookup(exact, { key: 'k', now }), false);
+  assert.equal(needsLookup(street, { now }), false);
+  assert.equal(needsLookup(street, { key: 'k', now }), true);
+  assert.equal(needsLookup(street, { key: 'k', googleOff: 'refused', now }), false);
+  assert.equal(needsLookup({ ...street, t: now - 29 * day }, { key: 'k', now }), false); // Google already tried
+  assert.equal(needsLookup({ ...exact, t: now - 31 * day }, { now }), true);
+});
+
+test('googleExact needs a house-level match that is not a guess', () => {
+  assert.equal(googleExact({ types: ['street_address'] }), true);
+  assert.equal(googleExact({ types: ['premise'], partial_match: false }), true);
+  assert.equal(googleExact({ types: ['street_address'], partial_match: true }), false);
+  assert.equal(googleExact({ types: ['route'] }), false);
 });
