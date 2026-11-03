@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseStops, geoQuery, geoQueries, findAddresses, order, pathCost, legs, mapsUrl } from './route.js';
+import { parseStops, geoQuery, geoQueries, findAddresses, straightTimes, order, pathCost, legs, mapsUrl } from './route.js';
 
 const line = xs => xs.map(a => xs.map(b => Math.abs(a - b)));
 
@@ -88,4 +88,16 @@ test('mapsUrl leaves out a blank origin and joins waypoints with |', () => {
   assert.equal(u.searchParams.get('waypoints'), '1 A ST, MADISON|2 B RD');
   assert.equal(u.searchParams.get('travelmode'), 'driving');
   assert.match(u.href, /waypoints=1\+A\+ST%2C\+MADISON%7C2\+B\+RD/);
+});
+
+test('straight-line fallback orders stops along a road and keeps the end last', () => {
+  // Points along a line of latitude, shuffled; the last one is the end.
+  const lngs = [-89.40, -89.10, -89.30, -88.90, -89.20, -88.80];
+  const d = straightTimes(lngs.map(lng => ({ lat: 43.07, lng })));
+  assert.equal(d[0][0], 0);
+  assert.ok(Math.abs(d[0][1] - d[1][0]) < 1e-6);
+  assert.ok(d[0][1] > 2300 && d[0][1] < 2800); // about 24 km apart, so roughly 42 min
+  const seq = order(d);
+  assert.deepEqual(seq, [0, 2, 4, 1, 3]);
+  assert.ok(!seq.includes(lngs.length - 1));
 });

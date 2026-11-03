@@ -1,4 +1,4 @@
-import { parseStops, geoQueries, findAddresses, order, pathCost, legs, mapsUrl } from './route.js';
+import { parseStops, geoQueries, findAddresses, straightTimes, order, pathCost, legs, mapsUrl } from './route.js';
 
 const $ = id => document.getElementById(id);
 const say = (t, bad) => { $('status').textContent = t; $('status').classList.toggle('bad', !!bad); };
@@ -57,7 +57,7 @@ function render() {
   const left = route.filter(p => !ticked.has(p.addr));
   const num = p => route.indexOf(p) + 1;
 
-  $('summary').textContent = `${route.length} stops · ${ticked.size ? `${ticked.size} done, ${left.length} left · ` : ''}about ${fmt(state.total)} of driving planned.`;
+  $('summary').textContent = `${route.length} stops · ${ticked.size ? `${ticked.size} done, ${left.length} left · ` : ''}about ${fmt(state.total)} of driving planned${state.rough ? ' (a rough guess from straight-line distance)' : ''}.`;
   // Misses are usually a misread letter (YAHADRA for YAHARA), so make each one a tap away from fixing.
   $('missing').hidden = !state.missing.length;
   $('missing').replaceChildren(...(state.missing.length ? [
@@ -153,7 +153,7 @@ $('shots').addEventListener('change', async e => {
 
 $('newday').addEventListener('click', () => {
   if (!confirm('Clear the stops and today\'s route? Your end place stays.')) return;
-  Object.assign(state, { start: '', stops: '', route: null, total: 0, missing: [], done: [] });
+  Object.assign(state, { start: '', stops: '', route: null, total: 0, missing: [], done: [], rough: false });
   $('start').value = $('stops').value = '';
   save(); render();
   say('Cleared. Import today\'s screenshots.');
@@ -181,7 +181,9 @@ $('plan').addEventListener('submit', async e => {
     const ok = pts.filter(p => p.lat != null);
 
     say('Working out the fastest order…');
-    const d = await driveTimes(ok);
+    // If the drive-time service is down, straight-line distance still gives a sensible order.
+    let rough = false;
+    const d = await driveTimes(ok).catch(() => { rough = true; return straightTimes(ok); });
     const seq = order(d, start ? 0 : null);
     Object.assign(state, {
       start, end,
@@ -189,9 +191,11 @@ $('plan').addEventListener('submit', async e => {
       total: pathCost(d, start ? [0, ...seq, ok.length - 1] : [...seq, ok.length - 1]),
       missing: pts.filter(p => p.lat == null).map(p => p.addr),
       done: kept.map(p => p.addr),
+      rough,
     });
     save(); render();
-    say('Planned. Open the legs in order, and tick stops off as you go.');
+    say(rough ? "The drive-time service didn't answer, so stops are ordered by straight-line distance. Plan again later for a better order."
+      : 'Planned. Open the legs in order, and tick stops off as you go.', rough);
   } catch (err) {
     say(err instanceof TypeError && /fetch|network|load/i.test(err.message) ? 'No connection to the map services. Check your signal and try again.' : err.message, true);
   }

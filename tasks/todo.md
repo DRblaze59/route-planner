@@ -76,11 +76,11 @@ No build step. Files sit at the repo root and are served by GitHub Pages.
 ## Task 6: When lookups miss or OSRM is down
 **Description:** Mark stops that only matched the street, or didn't match, as "check", and let you edit them and plan again. If OSRM fails, order the stops by straight-line distance (nearest-neighbour + 2-opt, fixed end) and show a notice.
 **Acceptance criteria:**
-- [ ] Stops not found are listed by name and never silently dropped
-- [ ] Tests for the straight-line fallback cover: points on a line come back in order, and the end stays last
-- [ ] OSRM failing still produces Maps legs, with a notice
+- [x] Stops not found are listed by name and never silently dropped
+- [x] Tests for the straight-line fallback cover: points on a line come back in order, and the end stays last
+- [x] OSRM failing still produces Maps legs, with a notice
 **Verification:**
-- [ ] `node --test` passes. Manual check: with a made-up address in the list, it gets flagged and the others still plan
+- [x] `node --test` passes. Manual check: with a made-up address in the list, it gets flagged and the others still plan
 **Dependencies:** Task 3
 **Files:** `app.js`, `route.js`, `route.test.js`
 **Scope:** S

@@ -44,7 +44,16 @@ export function geoQueries(addr) {
   return parts.length > 2 ? [q, `${parts[0]}, ${parts.at(-1)}`] : [q];
 }
 
-export const pathCost = (d, p) => p.reduce((s, v, i) => (i ? s + d[p[i - 1]][v] : 0), 0);
+// Drive-time guesses from straight-line distance, for when the drive-time service is down.
+// shortcut: roads assumed 1.3× the straight line at 45 km/h; good enough to order stops, not to time the day.
+export function straightTimes(pts) {
+  const rad = x => (x * Math.PI) / 180;
+  const km = (a, b) => 12742 * Math.asin(Math.sqrt(Math.sin(rad(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2));
+  return pts.map(a => pts.map(b => (km(a, b) * 1.3 / 45) * 3600));
+}
+
+export const pathCost =(d, p) => p.reduce((s, v, i) => (i ? s + d[p[i - 1]][v] : 0), 0);
 
 // d: matrix of drive times. The last index is the end. `start` is the index of a fixed
 // start, or null to let the route begin at whichever stop is best.
