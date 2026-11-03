@@ -55,7 +55,7 @@ li.done label { text-decoration: line-through; }
 .pair .btn { padding-inline: 8px; }
 .chip { display: inline-block; font-size: .75rem; padding: 0 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn-fg); white-space: nowrap; }
 .missing { color: var(--bad); font-size: .9rem; display: grid; gap: 6px; }
-.missing[hidden] { display: none; }
+[hidden] { display: none !important; } /* .card's display: grid would otherwise keep hidden cards on screen */
 .fix { font: .9rem var(--mono); text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--bad); background: transparent; color: var(--bad); cursor: pointer; overflow-wrap: anywhere; }
 .fix:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 </style>
