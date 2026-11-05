@@ -1,4 +1,4 @@
-import { parseStops, geoQueries, findAddresses, straightTimes, needsLookup, googleExact, order, pathCost, legs, mapsUrl } from './route.js';
+import { parseStops, geoQueries, findAddresses, cutOffStops, straightTimes, needsLookup, googleExact, order, pathCost, legs, mapsUrl } from './route.js';
 
 const $ = id => document.getElementById(id);
 const say = (t, bad) => { $('status').textContent = t; $('status').classList.toggle('bad', !!bad); };
@@ -186,13 +186,15 @@ $('shots').addEventListener('change', async e => {
       text.push((await w.recognize(f)).data.text);
     }
     const before = parseStops($('stops').value);
-    const read = findAddresses(text.join('\n'));
+    const read = findAddresses(text.join('\n')), cut = cutOffStops(text.join('\n'));
     const after = parseStops([...before, ...read].join('\n'));
     $('stops').value = state.stops = after.join('\n');
     save();
     const added = after.length - before.length;
     say(!read.length ? "Couldn't find any addresses in those screenshots. Check that they show the Itinerary List."
-      : `Added ${added} stop${added === 1 ? '' : 's'}${read.length > added ? ` (${read.length - added} already in the list)` : ''}. Check them, then plan.`, !read.length);
+      : `Added ${added} stop${added === 1 ? '' : 's'}${read.length > added ? ` (${read.length - added} already in the list)` : ''}. Check them, then plan.` +
+        (cut.length ? ` Flex cut off ${cut.length === 1 ? 'this stop' : 'these stops'} before the address, so type ${cut.length === 1 ? 'it' : 'them'} in by hand: ${cut.join('; ')}.` : ''),
+      !read.length || cut.length > 0);
   } catch (err) {
     say(err instanceof TypeError ? "Couldn't load the text reader. Check your signal and try again." : `Couldn't read the screenshots: ${err.message ?? err}`, true);
   }

@@ -16,7 +16,7 @@ export const geoQuery = addr => addr.replace(/[\s,]+(?:UNIT|APT|STE|SUITE|LOT|BL
 const COMMON = /\b(?:ST|AVE|RD|DR|LN|CT|CIR|TER|BLVD|WAY|PL|PKWY|TRL|HWY|PASS|RUN|XING|SQ|LOOP|PATH|ALY|PT|BND|RDG|CRES|STREET|AVENUE|ROAD|DRIVE|LANE|COURT|CIRCLE|TERRACE|BOULEVARD|PARKWAY|TRAIL|HIGHWAY|PLACE)\b/;
 // Every USPS street ending (abbreviated and spelled out), trusted only after a house number.
 // Short ones that read as ordinary words (IS, UN, DM) are left out.
-const SUFFIX = new RegExp(`\\b(?:${`ALY ALLEY ANX ANNEX ARC ARCADE AVE AVENUE BYU BAYOU BCH BEACH BND BEND BLF BLFS BLUFF BLUFFS
+const SUFFIX = new RegExp(`\\b(?:${`AV ALY ALLEY ANX ANNEX ARC ARCADE AVE AVENUE BYU BAYOU BCH BEACH BND BEND BLF BLFS BLUFF BLUFFS
   BTM BOTTOM BLVD BOULEVARD BR BRANCH BRG BRIDGE BRK BROOK BRKS BROOKS BG BURG BYP BYPASS CP CAMP CYN CANYON
   CPE CAPE CSWY CAUSEWAY CTR CENTER CTRS CIR CIRCLE CIRS CLF CLFS CLIFF CLIFFS CLB CLUB CMN COMMON CMNS COMMONS
   COR CORNER CORS CORNERS CRSE COURSE CT COURT CTS COURTS CV COVE CVS COVES CRK CREEK CRES CRESCENT CRST CREST
@@ -36,16 +36,21 @@ const SUFFIX = new RegExp(`\\b(?:${`ALY ALLEY ANX ANNEX ARC ARCADE AVE AVENUE BY
   VL VILLE VIS VISTA WALK WALL WAY WAYS WL WELL WLS WELLS BROADWAY`.trim().split(/\s+/).join('|')})\\b`);
 const HOUSE = /^(?:\d+[A-Z]?|[NSEW]\d+(?:[NSEW]\d+)?)$/; // 4437, 12B, and Wisconsin grid numbers like W204N11509
 const CITY = /^[A-Z][A-Z .'-]{1,30}$/;
+const CUT = /\s*(?:\.{2,}|…)$/; // Flex ends a line that doesn't fit with "..."
+
+// OCR lines, upper case, without the stray marks the reader picks up at the start (": 515 …", "| MADISON").
+const ocrLines = text => text.split('\n').map(s => s.trim().toUpperCase().replace(/^[^A-Z0-9]+/, '')).filter(Boolean);
 
 // Street addresses from the OCR text of Amazon Flex "Itinerary List" screenshots:
 // a street line starting with a house number, then the city alone on the next line.
 export function findAddresses(text) {
-  const lines = text.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
+  const lines = ocrLines(text);
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const words = lines[i].split(/\s+/);
     let street = null, next = i + 1;
-    if (words.length > 1 && HOUSE.test(words[0]) && SUFFIX.test(lines[i])) street = lines[i];
+    // A cut-off line after a house number is a long street; the lookup copes with the missing end.
+    if (words.length > 1 && HOUSE.test(words[0]) && (SUFFIX.test(lines[i]) || CUT.test(lines[i]))) street = lines[i].replace(CUT, '');
     else if (!COMMON.test(lines[i]) && COMMON.test(lines[next] ?? '') && !HOUSE.test(lines[next].split(/\s+/)[0])) {
       // A long business name pushed the house number onto the line above the street.
       const n = words.find(w => /^\d/.test(w) && HOUSE.test(w));
@@ -57,6 +62,15 @@ export function findAddresses(text) {
     i = city ? next : next - 1;
   }
   return out;
+}
+
+// Stops Flex cut off before any house number (a long business name over its city), so there's
+// no address to read. Listed so they can be typed in by hand instead of silently left out.
+export function cutOffStops(text) {
+  const lines = ocrLines(text);
+  const names = lines.filter((l, i) => CUT.test(l) && !HOUSE.test(l.split(/\s+/)[0]) &&
+    CITY.test(lines[i + 1] ?? '') && !COMMON.test(lines[i + 1])).map(l => l.replace(CUT, ''));
+  return [...new Set(names)];
 }
 
 // Lookups to try in order. Flex gives the postal city (STOUGHTON) but OpenStreetMap may file

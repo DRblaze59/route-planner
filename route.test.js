@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseStops, geoQuery, geoQueries, findAddresses, straightTimes, needsLookup, googleExact, order, pathCost, legs, mapsUrl } from './route.js';
+import { parseStops, geoQuery, geoQueries, findAddresses, cutOffStops, straightTimes, needsLookup, googleExact, order, pathCost, legs, mapsUrl } from './route.js';
 
 const line = xs => xs.map(a => xs.map(b => Math.abs(a - b)));
 
@@ -140,4 +140,16 @@ test('findAddresses keeps towns whose names hold street words', () => {
 
 test('findAddresses still ignores numbered lines that are not streets', () => {
   assert.deepEqual(findAddresses('Stop 5 of 32\n3 packages\n2 MIN AWAY\n76 GAS STATION'), []);
+});
+
+test('findAddresses reads AV, lines Flex cut off, and lines with stray marks in front', () => {
+  assert.deepEqual(findAddresses('100 sample av\nMadison\n210 EXAMPLE MEMORIAL BLV...\nMADISON\n: 515 TEST AVE APT 101\n| MADISON'),
+    ['100 SAMPLE AV, MADISON, WI', '210 EXAMPLE MEMORIAL BLV, MADISON, WI', '515 TEST AVE APT 101, MADISON, WI']);
+});
+
+test('cutOffStops lists name-only stops once, and not ones whose address was read', () => {
+  const text = 'SAMPLE APTS LEASING OFFICE 1...\nMADISON\nSAMPLE APTS LEASING OFFICE 1...\nMADISON\n' +
+    'EXAMPLE DENTAL CLINIC OF SOUTH...\n4437 NOTREAL RD\nMADISON\nSAMPLE FAMILY PHARMACY 12 ...\nFAKE ST\nMADISON\n210 EXAMPLE MEMORIAL BLV...\nMADISON';
+  assert.deepEqual(cutOffStops(text), ['SAMPLE APTS LEASING OFFICE 1']);
+  assert.deepEqual(findAddresses(text), ['4437 NOTREAL RD, MADISON, WI', '12 FAKE ST, MADISON, WI', '210 EXAMPLE MEMORIAL BLV, MADISON, WI']);
 });
