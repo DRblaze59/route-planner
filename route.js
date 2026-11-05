@@ -11,7 +11,29 @@ export function parseStops(text) {
 // Unit and apartment numbers confuse the address lookup; Maps still gets the full text.
 export const geoQuery = addr => addr.replace(/[\s,]+(?:UNIT|APT|STE|SUITE|LOT|BLDG|#)\s*[\w-]+/gi, '');
 
-const SUFFIX = /\b(?:ST|AVE|RD|DR|LN|CT|CIR|TER|BLVD|WAY|PL|PKWY|TRL|HWY|PASS|RUN|XING|SQ|LOOP|PATH|ALY|PT|BND|RDG|CRES|STREET|AVENUE|ROAD|DRIVE|LANE|COURT|CIRCLE|TERRACE|BOULEVARD|PARKWAY|TRAIL|HIGHWAY|PLACE)\b/;
+// Decides whether a line with no house number is a street. Kept short: the full list below would
+// take towns like LAKE MILLS or MOUNT HOREB for streets.
+const COMMON = /\b(?:ST|AVE|RD|DR|LN|CT|CIR|TER|BLVD|WAY|PL|PKWY|TRL|HWY|PASS|RUN|XING|SQ|LOOP|PATH|ALY|PT|BND|RDG|CRES|STREET|AVENUE|ROAD|DRIVE|LANE|COURT|CIRCLE|TERRACE|BOULEVARD|PARKWAY|TRAIL|HIGHWAY|PLACE)\b/;
+// Every USPS street ending (abbreviated and spelled out), trusted only after a house number.
+// Short ones that read as ordinary words (IS, UN, DM) are left out.
+const SUFFIX = new RegExp(`\\b(?:${`ALY ALLEY ANX ANNEX ARC ARCADE AVE AVENUE BYU BAYOU BCH BEACH BND BEND BLF BLFS BLUFF BLUFFS
+  BTM BOTTOM BLVD BOULEVARD BR BRANCH BRG BRIDGE BRK BROOK BRKS BROOKS BG BURG BYP BYPASS CP CAMP CYN CANYON
+  CPE CAPE CSWY CAUSEWAY CTR CENTER CTRS CIR CIRCLE CIRS CLF CLFS CLIFF CLIFFS CLB CLUB CMN COMMON CMNS COMMONS
+  COR CORNER CORS CORNERS CRSE COURSE CT COURT CTS COURTS CV COVE CVS COVES CRK CREEK CRES CRESCENT CRST CREST
+  XING CROSSING XRD CROSSROAD CURV CURVE DL DALE DV DIVIDE DR DRIVE DRS DRIVES EST ESTATE ESTS ESTATES
+  EXPY EXPRESSWAY EXT EXTENSION FALL FLS FALLS FRY FERRY FLD FIELD FLDS FIELDS FLT FLAT FLTS FLATS FRD FORD
+  FRST FOREST FRG FORGE FRK FORK FRKS FORKS FT FORT FWY FREEWAY GDN GARDEN GDNS GARDENS GTWY GATEWAY GLN GLEN
+  GLNS GLENS GRN GREEN GRNS GREENS GRV GROVE GRVS GROVES HBR HARBOR HVN HAVEN HTS HEIGHTS HWY HIGHWAY HL HILL
+  HLS HILLS HOLW HOLLOW INLT INLET ISLE JCT JUNCTION KY KEY KNL KNOLL KNLS KNOLLS LK LAKE LKS LAKES LNDG LANDING
+  LN LANE LGT LIGHT LF LOAF LCK LOCK LCKS LOCKS LDG LODGE LOOP MALL MNR MANOR MNRS MANORS MDW MEADOW MDWS MEADOWS
+  MEWS ML MILL MLS MILLS MSN MISSION MTWY MOTORWAY MT MOUNT MTN MOUNTAIN NCK NECK ORCH ORCHARD OVAL OPAS OVERPASS
+  PARK PARKS PKWY PARKWAY PKWYS PASS PSGE PASSAGE PATH PIKE PNE PINE PNES PINES PL PLACE PLN PLAIN PLNS PLAINS
+  PLZ PLAZA PT POINT PTS POINTS PRT PORT PRTS PORTS PR PRAIRIE RADL RADIAL RAMP RNCH RANCH RPD RAPID RPDS RAPIDS
+  RST REST RDG RIDGE RDGS RIDGES RIV RIVER RD ROAD RDS ROADS RTE ROUTE ROW RUE RUN SHL SHOAL SHR SHORE SHRS SHORES
+  SKWY SKYWAY SPG SPRING SPGS SPRINGS SPUR SQ SQUARE SQS SQUARES STA STRA STRAVENUE STRM STREAM ST STREET STS STREETS
+  SMT SUMMIT TER TERRACE TRWY THROUGHWAY TRCE TRACE TRAK TRACK TRFY TRAFFICWAY TRL TRAIL TRLR TRAILER TUNL TUNNEL
+  TPKE TURNPIKE UPAS UNDERPASS VLY VALLEY VLYS VALLEYS VIA VIADUCT VW VIEW VWS VIEWS VLG VILLAGE VLGS VILLAGES
+  VL VILLE VIS VISTA WALK WALL WAY WAYS WL WELL WLS WELLS BROADWAY`.trim().split(/\s+/).join('|')})\\b`);
 const HOUSE = /^(?:\d+[A-Z]?|[NSEW]\d+(?:[NSEW]\d+)?)$/; // 4437, 12B, and Wisconsin grid numbers like W204N11509
 const CITY = /^[A-Z][A-Z .'-]{1,30}$/;
 
@@ -24,13 +46,13 @@ export function findAddresses(text) {
     const words = lines[i].split(/\s+/);
     let street = null, next = i + 1;
     if (words.length > 1 && HOUSE.test(words[0]) && SUFFIX.test(lines[i])) street = lines[i];
-    else if (!SUFFIX.test(lines[i]) && SUFFIX.test(lines[next] ?? '') && !HOUSE.test(lines[next].split(/\s+/)[0])) {
+    else if (!COMMON.test(lines[i]) && COMMON.test(lines[next] ?? '') && !HOUSE.test(lines[next].split(/\s+/)[0])) {
       // A long business name pushed the house number onto the line above the street.
       const n = words.find(w => /^\d/.test(w) && HOUSE.test(w));
       if (n) { street = `${n} ${lines[next]}`; next++; }
     }
     if (!street) continue;
-    const city = CITY.test(lines[next] ?? '') && !SUFFIX.test(lines[next]) ? lines[next] : null;
+    const city = CITY.test(lines[next] ?? '') && !COMMON.test(lines[next]) ? lines[next] : null;
     out.push(city ? `${street}, ${city}, WI` : `${street}, WI`);
     i = city ? next : next - 1;
   }

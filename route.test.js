@@ -126,3 +126,18 @@ test('googleExact needs a house-level match that is not a guess', () => {
   assert.equal(googleExact({ types: ['street_address'], partial_match: true }), false);
   assert.equal(googleExact({ types: ['route'] }), false);
 });
+
+test('findAddresses knows every common street ending, and BROADWAY', () => {
+  const streets = ['4400 PINE RIDGE', '77 WILLOW BEND', '9 ASPEN CV', '300 STONE CRK', '15 FOX HOLW', '200 OAK TRCE',
+    '55 MAPLE GLN', '640 PARK VW', '18 BIRCH HTS', '12 CEDAR CROSSING', '8 ELM MDWS', '1200 BROADWAY'];
+  assert.deepEqual(findAddresses(streets.map(s => `${s}\nMADISON`).join('\n')), streets.map(s => `${s}, MADISON, WI`));
+});
+
+test('findAddresses keeps towns whose names hold street words', () => {
+  assert.deepEqual(findAddresses('12 SAMPLE CT\nLAKE MILLS\n30 EXAMPLE RD\nMOUNT HOREB\n5 TEST LN\nMENOMONEE FALLS'),
+    ['12 SAMPLE CT, LAKE MILLS, WI', '30 EXAMPLE RD, MOUNT HOREB, WI', '5 TEST LN, MENOMONEE FALLS, WI']);
+});
+
+test('findAddresses still ignores numbered lines that are not streets', () => {
+  assert.deepEqual(findAddresses('Stop 5 of 32\n3 packages\n2 MIN AWAY\n76 GAS STATION'), []);
+});
